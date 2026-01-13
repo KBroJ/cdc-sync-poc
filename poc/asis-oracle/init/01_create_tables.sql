@@ -3,6 +3,12 @@
 -- 01. 원본 테이블 생성
 -- ============================================
 
+-- PDB로 전환
+ALTER SESSION SET CONTAINER = XEPDB1;
+
+-- ASIS_USER 스키마로 전환
+ALTER SESSION SET CURRENT_SCHEMA = ASIS_USER;
+
 -- 레거시 코드 마스터 (ASIS→TOBE 단방향)
 CREATE TABLE LEGACY_CODE (
     CODE_ID     VARCHAR2(10) PRIMARY KEY,

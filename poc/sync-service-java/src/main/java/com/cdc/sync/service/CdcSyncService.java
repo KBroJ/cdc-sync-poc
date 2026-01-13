@@ -19,14 +19,12 @@ import java.util.Map;
 /**
  * CDC 동기화 서비스
  *
- * <p>CDC 이벤트를 수신하여 상대 DB의 CDC 테이블에 INSERT합니다.</p>
+ * CDC 이벤트를 수신하여 상대 DB의 CDC 테이블에 INSERT합니다.
  *
- * <h3>주요 기능:</h3>
- * <ul>
- *   <li>ASIS 이벤트 → TOBE DB CDC 테이블 INSERT</li>
- *   <li>TOBE 이벤트 → ASIS DB CDC 테이블 INSERT</li>
- *   <li>변경 데이터 해시 생성 (무한루프 방지용)</li>
- * </ul>
+ * 주요 기능:
+ *   - ASIS 이벤트 -> TOBE DB CDC 테이블 INSERT
+ *   - TOBE 이벤트 -> ASIS DB CDC 테이블 INSERT
+ *   - 변경 데이터 해시 생성 (무한루프 방지용)
  */
 @Service
 public class CdcSyncService {
@@ -164,7 +162,7 @@ public class CdcSyncService {
     }
 
     /**
-     * 데이터 미리보기 문자열 생성
+     * 데이터 미리보기 문자열 생성 (전체 데이터 표시)
      */
     private String createDataPreview(Map<String, Object> data) {
         if (data == null || data.isEmpty()) {
@@ -172,10 +170,10 @@ public class CdcSyncService {
         }
 
         StringBuilder sb = new StringBuilder();
-        sb.append("{");
+        sb.append("{\n");
         int count = 0;
         for (Map.Entry<String, Object> entry : data.entrySet()) {
-            if (count > 0) sb.append(", ");
+            if (count > 0) sb.append(",\n");
             String key = entry.getKey();
             Object value = entry.getValue();
 
@@ -188,47 +186,60 @@ public class CdcSyncService {
                 }
             }
 
-            // 값 포맷팅
+            // 값 포맷팅 (전체 표시, 짤림 없음)
             String valueStr;
             if (value == null) {
                 valueStr = "null";
             } else if (value instanceof String) {
-                String str = (String) value;
-                valueStr = "\"" + (str.length() > 30 ? str.substring(0, 30) + "..." : str) + "\"";
+                valueStr = "\"" + value + "\"";
             } else {
                 valueStr = String.valueOf(value);
             }
 
-            sb.append(key).append(": ").append(valueStr);
+            sb.append("  ").append(key).append(": ").append(valueStr);
             count++;
-            if (count >= 5) {
-                sb.append(", ...");
-                break;
-            }
         }
-        sb.append("}");
+        sb.append("\n}");
         return sb.toString();
     }
 
     /**
-     * Epoch 밀리초를 java.sql.Timestamp로 변환
+     * Debezium 타임스탬프를 java.sql.Timestamp로 변환
      *
-     * <p>Debezium은 Oracle DATE/TIMESTAMP를 epoch milliseconds로 전송합니다.</p>
+     * Debezium은 Oracle DATE/TIMESTAMP를 다양한 형식으로 전송합니다:
+     *   - io.debezium.time.MicroTimestamp: 마이크로초 (나누기 1000 필요)
+     *   - io.debezium.time.Timestamp: 밀리초
+     *   - io.debezium.time.Date: epoch days (곱하기 86400000 필요)
      *
-     * @param epochMs epoch 밀리초
+     * @param epochValue epoch 값 (마이크로초, 밀리초, 또는 일수)
      * @return java.sql.Timestamp
      */
-    private Timestamp convertEpochToTimestamp(long epochMs) {
+    private Timestamp convertEpochToTimestamp(long epochValue) {
+        // 값 범위로 형식 추정
+        // 마이크로초: 10^15 이상 (예: 1768279886846975)
+        // 밀리초: 10^12 ~ 10^15 (예: 1768279886846)
+        // 일수: 10^5 미만 (예: 19736 = 2024-01-13)
+
+        long epochMs;
+        if (epochValue > 100_000_000_000_000L) {
+            // 마이크로초 → 밀리초로 변환
+            epochMs = epochValue / 1000;
+        } else if (epochValue < 100_000) {
+            // 일수 → 밀리초로 변환
+            epochMs = epochValue * 86400000L;
+        } else {
+            // 이미 밀리초
+            epochMs = epochValue;
+        }
+
         return new Timestamp(epochMs);
     }
 
     /**
      * Debezium NUMBER 타입 디코딩
      *
-     * <p>Debezium은 Oracle NUMBER를 다음 형식으로 전송합니다:</p>
-     * <pre>
-     * { "scale": 0, "value": "AQ==" }  // Base64 인코딩된 BigInteger
-     * </pre>
+     * Debezium은 Oracle NUMBER를 다음 형식으로 전송합니다:
+     *   { "scale": 0, "value": "AQ==" }  (Base64 인코딩된 BigInteger)
      *
      * @param complexValue Debezium 복합 값
      * @return 디코딩된 숫자
@@ -258,7 +269,7 @@ public class CdcSyncService {
     /**
      * 데이터 해시 생성 (SHA-256)
      *
-     * <p>무한루프 방지를 위해 변경 데이터의 해시를 생성합니다.</p>
+     * 무한루프 방지를 위해 변경 데이터의 해시를 생성합니다.
      *
      * @param data 데이터 맵
      * @return SHA-256 해시 문자열

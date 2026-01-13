@@ -3,6 +3,12 @@
 -- 01. 원본 테이블 생성 (신 스키마 - 표준화)
 -- ============================================
 
+-- PDB로 전환
+ALTER SESSION SET CONTAINER = XEPDB1;
+
+-- TOBE_USER 스키마로 전환
+ALTER SESSION SET CURRENT_SCHEMA = TOBE_USER;
+
 -- 레거시 코드 수신용 (ASIS→TOBE 단방향)
 CREATE TABLE TB_LEGACY_CODE (
     CODE_ID         VARCHAR2(10) PRIMARY KEY,

@@ -17,14 +17,12 @@ import java.util.Map;
 /**
  * Kafka Consumer 설정
  *
- * <p>Debezium CDC 이벤트를 수신하기 위한 Kafka Consumer를 설정합니다.</p>
+ * Debezium CDC 이벤트를 수신하기 위한 Kafka Consumer를 설정합니다.
  *
- * <h3>설정 항목:</h3>
- * <ul>
- *   <li>bootstrap-servers: Kafka 브로커 주소</li>
- *   <li>group-id: Consumer Group ID</li>
- *   <li>auto-offset-reset: 오프셋 초기화 정책</li>
- * </ul>
+ * 설정 항목:
+ *   - bootstrap-servers: Kafka 브로커 주소
+ *   - group-id: Consumer Group ID
+ *   - auto-offset-reset: 오프셋 초기화 정책
  */
 @Configuration
 @EnableKafka
@@ -72,7 +70,7 @@ public class KafkaConfig {
     /**
      * Kafka Listener Container Factory 생성
      *
-     * <p>@KafkaListener 어노테이션이 사용하는 팩토리입니다.</p>
+     * @KafkaListener 어노테이션이 사용하는 팩토리입니다.
      */
     @Bean
     public ConcurrentKafkaListenerContainerFactory<String, String> kafkaListenerContainerFactory() {

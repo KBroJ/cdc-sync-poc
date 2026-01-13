@@ -13,7 +13,7 @@ import java.util.concurrent.atomic.AtomicLong;
 /**
  * CDC 모니터링 서비스
  *
- * <p>CDC 이벤트 처리 통계 및 에러 로그를 관리합니다.</p>
+ * CDC 이벤트 처리 통계 및 에러 로그를 관리합니다.
  */
 @Service
 public class CdcMonitoringService {

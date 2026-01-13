@@ -8,21 +8,19 @@ import java.util.Map;
 /**
  * CDC 이벤트 모델
  *
- * <p>Debezium에서 발생한 CDC 이벤트를 표현합니다.</p>
+ * Debezium에서 발생한 CDC 이벤트를 표현합니다.
  *
- * <h3>Debezium 이벤트 구조:</h3>
- * <pre>
- * {
- *   "schema": { ... },
- *   "payload": {
- *     "before": { 변경 전 데이터 },
- *     "after": { 변경 후 데이터 },
- *     "source": { 소스 DB 정보 },
- *     "op": "c|u|d|r",
- *     "ts_ms": 1234567890123
+ * Debezium 이벤트 구조:
+ *   {
+ *     "schema": { ... },
+ *     "payload": {
+ *       "before": { 변경 전 데이터 },
+ *       "after": { 변경 후 데이터 },
+ *       "source": { 소스 DB 정보 },
+ *       "op": "c|u|d|r",
+ *       "ts_ms": 1234567890123
+ *     }
  *   }
- * }
- * </pre>
  */
 public class CdcEvent {
 

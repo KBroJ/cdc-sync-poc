@@ -3,6 +3,12 @@
 -- 04. WORKER 프로시저 생성
 -- ============================================
 
+-- PDB로 전환
+ALTER SESSION SET CONTAINER = XEPDB1;
+
+-- ASIS_USER 스키마로 전환
+ALTER SESSION SET CURRENT_SCHEMA = ASIS_USER;
+
 -- 해시 생성 함수
 CREATE OR REPLACE FUNCTION FN_GENERATE_HASH(
     p_table_name  VARCHAR2,
@@ -124,7 +130,7 @@ BEGIN
                 UPDATE CDC_ASIS_BOOK
                 SET PROCESSED_YN = 'E',
                     PROCESSED_AT = SYSTIMESTAMP,
-                    ERROR_MSG = SQLERRM
+                    ERROR_MSG = SUBSTR(SQLERRM, 1, 500)
                 WHERE CDC_SEQ = rec.CDC_SEQ;
                 COMMIT;
         END;
@@ -191,11 +197,11 @@ BEGIN
                 UPDATE STAGING_ASIS_BOOK
                 SET PROCESSED_YN = 'E',
                     PROCESSED_AT = SYSTIMESTAMP,
-                    ERROR_MSG = SQLERRM
+                    ERROR_MSG = SUBSTR(SQLERRM, 1, 500)
                 WHERE STAGING_SEQ = rec.STAGING_SEQ;
 
                 INSERT INTO CDC_SYNC_LOG (DIRECTION, TABLE_NAME, OPERATION, PK_VALUE, STATUS, ERROR_MSG)
-                VALUES ('TOBE_TO_ASIS', 'BOOK_INFO', rec.OPERATION, TO_CHAR(rec.BOOK_ID), 'FAILED', SQLERRM);
+                VALUES ('TOBE_TO_ASIS', 'BOOK_INFO', rec.OPERATION, TO_CHAR(rec.BOOK_ID), 'FAILED', SUBSTR(SQLERRM, 1, 500));
                 COMMIT;
         END;
     END LOOP;
@@ -240,7 +246,7 @@ BEGIN
             COMMIT;
         EXCEPTION
             WHEN OTHERS THEN
-                UPDATE CDC_ASIS_MEMBER SET PROCESSED_YN = 'E', PROCESSED_AT = SYSTIMESTAMP, ERROR_MSG = SQLERRM WHERE CDC_SEQ = rec.CDC_SEQ;
+                UPDATE CDC_ASIS_MEMBER SET PROCESSED_YN = 'E', PROCESSED_AT = SYSTIMESTAMP, ERROR_MSG = SUBSTR(SQLERRM, 1, 500) WHERE CDC_SEQ = rec.CDC_SEQ;
                 COMMIT;
         END;
     END LOOP;
@@ -270,7 +276,7 @@ BEGIN
                 UPDATE STAGING_ASIS_MEMBER SET PROCESSED_YN = 'Y', PROCESSED_AT = SYSTIMESTAMP WHERE STAGING_SEQ = rec.STAGING_SEQ;
                 COMMIT;
             WHEN OTHERS THEN
-                UPDATE STAGING_ASIS_MEMBER SET PROCESSED_YN = 'E', ERROR_MSG = SQLERRM WHERE STAGING_SEQ = rec.STAGING_SEQ;
+                UPDATE STAGING_ASIS_MEMBER SET PROCESSED_YN = 'E', ERROR_MSG = SUBSTR(SQLERRM, 1, 500) WHERE STAGING_SEQ = rec.STAGING_SEQ;
                 COMMIT;
         END;
     END LOOP;
@@ -302,7 +308,7 @@ BEGIN
             COMMIT;
         EXCEPTION
             WHEN OTHERS THEN
-                UPDATE CDC_ASIS_NEW_SERVICE SET PROCESSED_YN = 'E', ERROR_MSG = SQLERRM WHERE CDC_SEQ = rec.CDC_SEQ;
+                UPDATE CDC_ASIS_NEW_SERVICE SET PROCESSED_YN = 'E', ERROR_MSG = SUBSTR(SQLERRM, 1, 500) WHERE CDC_SEQ = rec.CDC_SEQ;
                 COMMIT;
         END;
     END LOOP;
@@ -328,7 +334,7 @@ BEGIN
                 UPDATE STAGING_ASIS_NEW_SERVICE SET PROCESSED_YN = 'Y' WHERE STAGING_SEQ = rec.STAGING_SEQ;
                 COMMIT;
             WHEN OTHERS THEN
-                UPDATE STAGING_ASIS_NEW_SERVICE SET PROCESSED_YN = 'E', ERROR_MSG = SQLERRM WHERE STAGING_SEQ = rec.STAGING_SEQ;
+                UPDATE STAGING_ASIS_NEW_SERVICE SET PROCESSED_YN = 'E', ERROR_MSG = SUBSTR(SQLERRM, 1, 500) WHERE STAGING_SEQ = rec.STAGING_SEQ;
                 COMMIT;
         END;
     END LOOP;
@@ -345,3 +351,33 @@ BEGIN
     SP_WORKER_NEW_SERVICE;
 END;
 /
+
+-- ============================================
+-- Oracle Scheduler Job 생성
+-- 5초마다 WORKER 프로시저 실행
+-- ============================================
+
+-- 기존 Job이 있으면 삭제
+BEGIN
+    DBMS_SCHEDULER.DROP_JOB(job_name => 'JOB_CDC_WORKER', force => TRUE);
+EXCEPTION
+    WHEN OTHERS THEN NULL;  -- Job이 없으면 무시
+END;
+/
+
+-- Scheduler Job 생성
+BEGIN
+    DBMS_SCHEDULER.CREATE_JOB(
+        job_name        => 'JOB_CDC_WORKER',
+        job_type        => 'PLSQL_BLOCK',
+        job_action      => 'BEGIN SP_RUN_ALL_WORKERS; END;',
+        start_date      => SYSTIMESTAMP,
+        repeat_interval => 'FREQ=SECONDLY;INTERVAL=5',  -- 5초마다 실행
+        enabled         => TRUE,
+        comments        => 'CDC WORKER 프로시저 주기적 실행 (5초)'
+    );
+END;
+/
+
+-- Job 상태 확인용 쿼리 (참고용)
+-- SELECT job_name, state, last_start_date, next_run_date FROM USER_SCHEDULER_JOBS WHERE job_name = 'JOB_CDC_WORKER';

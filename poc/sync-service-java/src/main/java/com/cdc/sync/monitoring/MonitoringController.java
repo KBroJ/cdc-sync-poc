@@ -10,14 +10,12 @@ import java.util.Map;
 /**
  * CDC 모니터링 REST API 컨트롤러
  *
- * <h3>엔드포인트:</h3>
- * <ul>
- *   <li>GET /api/monitoring/stats - 전체 통계</li>
- *   <li>GET /api/monitoring/errors - 최근 에러 목록</li>
- *   <li>GET /api/monitoring/events - 최근 이벤트 목록</li>
- *   <li>GET /api/monitoring/dashboard - 대시보드 데이터</li>
- *   <li>POST /api/monitoring/reset - 통계 초기화</li>
- * </ul>
+ * 엔드포인트:
+ *   - GET /api/monitoring/stats       : 전체 통계
+ *   - GET /api/monitoring/errors      : 최근 에러 목록
+ *   - GET /api/monitoring/events      : 최근 이벤트 목록
+ *   - GET /api/monitoring/dashboard   : 대시보드 데이터
+ *   - POST /api/monitoring/reset      : 통계 초기화
  */
 @RestController
 @RequestMapping("/api/monitoring")

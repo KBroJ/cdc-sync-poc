@@ -3,6 +3,12 @@
 -- 02. CDC 관련 테이블 생성
 -- ============================================
 
+-- PDB로 전환
+ALTER SESSION SET CONTAINER = XEPDB1;
+
+-- TOBE_USER 스키마로 전환
+ALTER SESSION SET CURRENT_SCHEMA = TOBE_USER;
+
 -- CDC_TOBE_TABLES: ASIS에서 받은 데이터 저장
 CREATE TABLE CDC_TOBE_LEGACY_CODE (
     CDC_SEQ         NUMBER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,

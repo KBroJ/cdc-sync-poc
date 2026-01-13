@@ -14,20 +14,16 @@ import javax.sql.DataSource;
 /**
  * 다중 데이터소스 설정
  *
- * <p>ASIS DB와 TOBE DB 두 개의 데이터소스를 설정합니다.</p>
+ * ASIS DB와 TOBE DB 두 개의 데이터소스를 설정합니다.
  *
- * <h3>사용 예시:</h3>
- * <pre>
- * {@code
- * @Autowired
- * @Qualifier("asisJdbcTemplate")
- * private JdbcTemplate asisJdbcTemplate;
+ * 사용 예시:
+ *   @Autowired
+ *   @Qualifier("asisJdbcTemplate")
+ *   private JdbcTemplate asisJdbcTemplate;
  *
- * @Autowired
- * @Qualifier("tobeJdbcTemplate")
- * private JdbcTemplate tobeJdbcTemplate;
- * }
- * </pre>
+ *   @Autowired
+ *   @Qualifier("tobeJdbcTemplate")
+ *   private JdbcTemplate tobeJdbcTemplate;
  */
 @Configuration
 public class DataSourceConfig {

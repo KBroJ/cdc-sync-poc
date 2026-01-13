@@ -16,20 +16,16 @@ import java.util.Map;
 /**
  * CDC Kafka Consumer
  *
- * <p>Debezium이 발행한 CDC 이벤트를 수신하여 처리합니다.</p>
+ * Debezium이 발행한 CDC 이벤트를 수신하여 처리합니다.
  *
- * <h3>구독 토픽:</h3>
- * <ul>
- *   <li>ASIS 토픽: asis.ASIS_USER.* (BOOK_INFO, MEMBER_INFO, LEGACY_CODE)</li>
- *   <li>TOBE 토픽: tobe.TOBE_USER.* (TB_BOOK, TB_MEMBER, TB_NEW_SERVICE)</li>
- * </ul>
+ * 구독 토픽:
+ *   - ASIS 토픽: asis.ASIS_USER.* (BOOK_INFO, MEMBER_INFO, LEGACY_CODE)
+ *   - TOBE 토픽: tobe.TOBE_USER.* (TB_BOOK, TB_MEMBER, TB_NEW_SERVICE)
  *
- * <h3>처리 흐름:</h3>
- * <ol>
- *   <li>Kafka 메시지 수신</li>
- *   <li>JSON 파싱 → CdcEvent 변환</li>
- *   <li>토픽에 따라 대상 DB CDC 테이블에 INSERT</li>
- * </ol>
+ * 처리 흐름:
+ *   1. Kafka 메시지 수신
+ *   2. JSON 파싱 -> CdcEvent 변환
+ *   3. 토픽에 따라 대상 DB CDC 테이블에 INSERT
  */
 @Component
 public class CdcKafkaConsumer {
@@ -137,7 +133,7 @@ public class CdcKafkaConsumer {
     /**
      * Debezium 메시지 파싱
      *
-     * <p>Debezium JSON 메시지를 CdcEvent 객체로 변환합니다.</p>
+     * Debezium JSON 메시지를 CdcEvent 객체로 변환합니다.
      *
      * @param message JSON 문자열
      * @return CdcEvent 객체

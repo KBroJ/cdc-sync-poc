@@ -3,6 +3,12 @@
 -- 05. 샘플 데이터 입력
 -- ============================================
 
+-- PDB로 전환
+ALTER SESSION SET CONTAINER = XEPDB1;
+
+-- ASIS_USER 스키마로 전환
+ALTER SESSION SET CURRENT_SCHEMA = ASIS_USER;
+
 -- 레거시 코드 마스터
 INSERT INTO LEGACY_CODE (CODE_ID, CODE_NAME, USE_YN) VALUES ('CAT01', '문학', 'Y');
 INSERT INTO LEGACY_CODE (CODE_ID, CODE_NAME, USE_YN) VALUES ('CAT02', '과학', 'Y');

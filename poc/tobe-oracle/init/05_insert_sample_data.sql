@@ -3,6 +3,12 @@
 -- 05. 샘플 데이터 입력
 -- ============================================
 
+-- PDB로 전환
+ALTER SESSION SET CONTAINER = XEPDB1;
+
+-- TOBE_USER 스키마로 전환
+ALTER SESSION SET CURRENT_SCHEMA = TOBE_USER;
+
 -- 도서 정보 (ASIS와 동일한 데이터를 TOBE 스키마로)
 INSERT INTO TB_BOOK (BOOK_ID, TITLE, AUTHOR_NAME, CATEGORY_CD, IS_ACTIVE)
 VALUES (1, '홍길동전', '허균', 'LIT', 1);

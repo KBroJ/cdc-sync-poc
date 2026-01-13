@@ -3,6 +3,12 @@
 -- 03. 매핑 테이블 생성 및 데이터 입력
 -- ============================================
 
+-- PDB로 전환
+ALTER SESSION SET CONTAINER = XEPDB1;
+
+-- TOBE_USER 스키마로 전환
+ALTER SESSION SET CURRENT_SCHEMA = TOBE_USER;
+
 -- 코드 매핑 테이블
 CREATE TABLE SYNC_CODE_MAPPING (
     MAP_GROUP       VARCHAR2(50),
