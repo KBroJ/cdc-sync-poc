@@ -80,6 +80,7 @@ CREATE OR REPLACE PROCEDURE SP_WORKER_BOOK
 IS
     v_hash VARCHAR2(64);
     v_is_loop BOOLEAN;
+    v_err_msg VARCHAR2(500);
 BEGIN
     -- 1단계: CDC → STAGING (스키마 변환)
     FOR rec IN (
@@ -127,10 +128,11 @@ BEGIN
             COMMIT;
         EXCEPTION
             WHEN OTHERS THEN
+                v_err_msg := SUBSTR(SQLERRM, 1, 500);
                 UPDATE CDC_ASIS_BOOK
                 SET PROCESSED_YN = 'E',
                     PROCESSED_AT = SYSTIMESTAMP,
-                    ERROR_MSG = SUBSTR(SQLERRM, 1, 500)
+                    ERROR_MSG = v_err_msg
                 WHERE CDC_SEQ = rec.CDC_SEQ;
                 COMMIT;
         END;
@@ -194,14 +196,15 @@ BEGIN
                 WHERE STAGING_SEQ = rec.STAGING_SEQ;
                 COMMIT;
             WHEN OTHERS THEN
+                v_err_msg := SUBSTR(SQLERRM, 1, 500);
                 UPDATE STAGING_ASIS_BOOK
                 SET PROCESSED_YN = 'E',
                     PROCESSED_AT = SYSTIMESTAMP,
-                    ERROR_MSG = SUBSTR(SQLERRM, 1, 500)
+                    ERROR_MSG = v_err_msg
                 WHERE STAGING_SEQ = rec.STAGING_SEQ;
 
                 INSERT INTO CDC_SYNC_LOG (DIRECTION, TABLE_NAME, OPERATION, PK_VALUE, STATUS, ERROR_MSG)
-                VALUES ('TOBE_TO_ASIS', 'BOOK_INFO', rec.OPERATION, TO_CHAR(rec.BOOK_ID), 'FAILED', SUBSTR(SQLERRM, 1, 500));
+                VALUES ('TOBE_TO_ASIS', 'BOOK_INFO', rec.OPERATION, TO_CHAR(rec.BOOK_ID), 'FAILED', v_err_msg);
                 COMMIT;
         END;
     END LOOP;
@@ -214,6 +217,7 @@ END;
 CREATE OR REPLACE PROCEDURE SP_WORKER_MEMBER
 IS
     v_hash VARCHAR2(64);
+    v_err_msg VARCHAR2(500);
 BEGIN
     -- 1단계: CDC → STAGING (스키마 변환)
     FOR rec IN (
@@ -246,7 +250,8 @@ BEGIN
             COMMIT;
         EXCEPTION
             WHEN OTHERS THEN
-                UPDATE CDC_ASIS_MEMBER SET PROCESSED_YN = 'E', PROCESSED_AT = SYSTIMESTAMP, ERROR_MSG = SUBSTR(SQLERRM, 1, 500) WHERE CDC_SEQ = rec.CDC_SEQ;
+                v_err_msg := SUBSTR(SQLERRM, 1, 500);
+                UPDATE CDC_ASIS_MEMBER SET PROCESSED_YN = 'E', PROCESSED_AT = SYSTIMESTAMP, ERROR_MSG = v_err_msg WHERE CDC_SEQ = rec.CDC_SEQ;
                 COMMIT;
         END;
     END LOOP;
@@ -276,7 +281,8 @@ BEGIN
                 UPDATE STAGING_ASIS_MEMBER SET PROCESSED_YN = 'Y', PROCESSED_AT = SYSTIMESTAMP WHERE STAGING_SEQ = rec.STAGING_SEQ;
                 COMMIT;
             WHEN OTHERS THEN
-                UPDATE STAGING_ASIS_MEMBER SET PROCESSED_YN = 'E', ERROR_MSG = SUBSTR(SQLERRM, 1, 500) WHERE STAGING_SEQ = rec.STAGING_SEQ;
+                v_err_msg := SUBSTR(SQLERRM, 1, 500);
+                UPDATE STAGING_ASIS_MEMBER SET PROCESSED_YN = 'E', ERROR_MSG = v_err_msg WHERE STAGING_SEQ = rec.STAGING_SEQ;
                 COMMIT;
         END;
     END LOOP;
@@ -288,6 +294,7 @@ END;
 -- ============================================
 CREATE OR REPLACE PROCEDURE SP_WORKER_NEW_SERVICE
 IS
+    v_err_msg VARCHAR2(500);
 BEGIN
     -- 1단계: CDC → STAGING
     FOR rec IN (
@@ -308,7 +315,8 @@ BEGIN
             COMMIT;
         EXCEPTION
             WHEN OTHERS THEN
-                UPDATE CDC_ASIS_NEW_SERVICE SET PROCESSED_YN = 'E', ERROR_MSG = SUBSTR(SQLERRM, 1, 500) WHERE CDC_SEQ = rec.CDC_SEQ;
+                v_err_msg := SUBSTR(SQLERRM, 1, 500);
+                UPDATE CDC_ASIS_NEW_SERVICE SET PROCESSED_YN = 'E', ERROR_MSG = v_err_msg WHERE CDC_SEQ = rec.CDC_SEQ;
                 COMMIT;
         END;
     END LOOP;
@@ -334,7 +342,8 @@ BEGIN
                 UPDATE STAGING_ASIS_NEW_SERVICE SET PROCESSED_YN = 'Y' WHERE STAGING_SEQ = rec.STAGING_SEQ;
                 COMMIT;
             WHEN OTHERS THEN
-                UPDATE STAGING_ASIS_NEW_SERVICE SET PROCESSED_YN = 'E', ERROR_MSG = SUBSTR(SQLERRM, 1, 500) WHERE STAGING_SEQ = rec.STAGING_SEQ;
+                v_err_msg := SUBSTR(SQLERRM, 1, 500);
+                UPDATE STAGING_ASIS_NEW_SERVICE SET PROCESSED_YN = 'E', ERROR_MSG = v_err_msg WHERE STAGING_SEQ = rec.STAGING_SEQ;
                 COMMIT;
         END;
     END LOOP;

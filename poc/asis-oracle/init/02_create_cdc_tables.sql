@@ -18,6 +18,10 @@ CREATE TABLE CDC_ASIS_BOOK (
     AUTHOR_NAME     VARCHAR2(200),
     CATEGORY_CD     VARCHAR2(10),
     IS_ACTIVE       NUMBER(1),
+    CREATED_AT      TIMESTAMP,              -- TB_BOOK에서 전송되는 컬럼
+    UPDATED_AT      TIMESTAMP,              -- TB_BOOK에서 전송되는 컬럼
+    CREATED_BY      VARCHAR2(50),           -- TB_BOOK에서 전송되는 컬럼
+    UPDATED_BY      VARCHAR2(50),           -- TB_BOOK에서 전송되는 컬럼
     SOURCE_TIMESTAMP TIMESTAMP,
     RECEIVED_AT     TIMESTAMP DEFAULT SYSTIMESTAMP,
     PROCESSED_YN    CHAR(1) DEFAULT 'N',

@@ -8,7 +8,7 @@ services:
       APP_USER: asis_user
       APP_USER_PASSWORD: asis123
     ports:
-      - "1521:1521"
+      - "15210:1521"
     volumes:
       - asis-oracle-data:/opt/oracle/oradata
       - ./asis-oracle/init:/container-entrypoint-initdb.d
@@ -29,7 +29,7 @@ services:
       APP_USER: tobe_user
       APP_USER_PASSWORD: tobe123
     ports:
-      - "1522:1521"
+      - "15220:1521"
     volumes:
       - tobe-oracle-data:/opt/oracle/oradata
       - ./tobe-oracle/init:/container-entrypoint-initdb.d

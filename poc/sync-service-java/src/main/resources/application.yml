@@ -9,6 +9,13 @@ spring:
   application:
     name: cdc-sync-service
 
+  # Thymeleaf 설정
+  thymeleaf:
+    cache: false
+    prefix: classpath:/templates/
+    suffix: .html
+    encoding: UTF-8
+
   # Kafka 설정
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:29092}
@@ -73,6 +80,116 @@ cdc:
         target-table: CDC_ASIS_MEMBER
       - source-topic: tobe.TOBE_USER.TB_NEW_SERVICE
         target-table: CDC_ASIS_NEW_SERVICE
+
+  # ==============================================
+  # 시뮬레이터용 테이블 설정
+  # ==============================================
+  simulator:
+    tables:
+      # 양방향 동기화 테이블
+      - name: BOOK
+        display-name: 도서
+        direction: BIDIRECTIONAL
+        asis:
+          table: BOOK_INFO
+          pk: BOOK_ID
+          columns:
+            - { name: BOOK_ID, type: NUMBER, display: "도서ID", required: true }
+            - { name: BOOK_TITLE, type: VARCHAR2, display: "제목", required: true }
+            - { name: AUTHOR, type: VARCHAR2, display: "저자" }
+            - { name: CATEGORY, type: VARCHAR2, display: "카테고리" }
+            - { name: STATUS, type: CHAR, display: "상태", default: "Y" }
+        tobe:
+          table: TB_BOOK
+          pk: BOOK_ID
+          columns:
+            - { name: BOOK_ID, type: NUMBER, display: "도서ID", required: true }
+            - { name: TITLE, type: VARCHAR2, display: "제목", required: true }
+            - { name: AUTHOR_NAME, type: VARCHAR2, display: "저자명" }
+            - { name: CATEGORY_CD, type: VARCHAR2, display: "카테고리코드" }
+            - { name: IS_ACTIVE, type: NUMBER, display: "활성여부", default: "1" }
+        cdc-table:
+          asis: CDC_ASIS_BOOK
+          tobe: CDC_TOBE_BOOK
+        staging-table:
+          asis: STAGING_ASIS_BOOK
+          tobe: STAGING_TOBE_BOOK
+
+      - name: MEMBER
+        display-name: 회원
+        direction: BIDIRECTIONAL
+        asis:
+          table: MEMBER_INFO
+          pk: MEMBER_ID
+          columns:
+            - { name: MEMBER_ID, type: NUMBER, display: "회원ID", required: true }
+            - { name: MEMBER_NAME, type: VARCHAR2, display: "회원명", required: true }
+            - { name: EMAIL, type: VARCHAR2, display: "이메일" }
+            - { name: MEMBER_TYPE, type: CHAR, display: "회원유형" }
+            - { name: STATUS, type: CHAR, display: "상태", default: "Y" }
+        tobe:
+          table: TB_MEMBER
+          pk: MEMBER_ID
+          columns:
+            - { name: MEMBER_ID, type: NUMBER, display: "회원ID", required: true }
+            - { name: MEMBER_NAME, type: VARCHAR2, display: "회원명", required: true }
+            - { name: EMAIL_ADDR, type: VARCHAR2, display: "이메일주소" }
+            - { name: MEMBER_TYPE_CD, type: VARCHAR2, display: "회원유형코드" }
+            - { name: IS_ACTIVE, type: NUMBER, display: "활성여부", default: "1" }
+        cdc-table:
+          asis: CDC_ASIS_MEMBER
+          tobe: CDC_TOBE_MEMBER
+        staging-table:
+          asis: STAGING_ASIS_MEMBER
+          tobe: STAGING_TOBE_MEMBER
+
+      # 단방향: ASIS -> TOBE
+      - name: LEGACY_CODE
+        display-name: 레거시코드
+        direction: ASIS_TO_TOBE
+        asis:
+          table: LEGACY_CODE
+          pk: CODE_ID
+          columns:
+            - { name: CODE_ID, type: VARCHAR2, display: "코드ID", required: true }
+            - { name: CODE_NAME, type: VARCHAR2, display: "코드명", required: true }
+            - { name: USE_YN, type: CHAR, display: "사용여부", default: "Y" }
+        tobe:
+          table: TB_LEGACY_CODE
+          pk: CODE_ID
+          columns:
+            - { name: CODE_ID, type: VARCHAR2, display: "코드ID", required: true }
+            - { name: CODE_NAME, type: VARCHAR2, display: "코드명", required: true }
+            - { name: IS_ACTIVE, type: NUMBER, display: "활성여부", default: "1" }
+        cdc-table:
+          tobe: CDC_TOBE_LEGACY_CODE
+        staging-table:
+          tobe: STAGING_TOBE_LEGACY_CODE
+
+      # 단방향: TOBE -> ASIS
+      - name: NEW_SERVICE
+        display-name: 신규서비스
+        direction: TOBE_TO_ASIS
+        asis:
+          table: NEW_SERVICE_RECV
+          pk: SERVICE_ID
+          columns:
+            - { name: SERVICE_ID, type: NUMBER, display: "서비스ID", required: true }
+            - { name: SERVICE_NM, type: VARCHAR2, display: "서비스명", required: true }
+            - { name: SVC_TYPE, type: VARCHAR2, display: "서비스유형" }
+            - { name: USE_YN, type: CHAR, display: "사용여부", default: "Y" }
+        tobe:
+          table: TB_NEW_SERVICE
+          pk: SERVICE_ID
+          columns:
+            - { name: SERVICE_ID, type: NUMBER, display: "서비스ID", required: true }
+            - { name: SERVICE_NAME, type: VARCHAR2, display: "서비스명", required: true }
+            - { name: SERVICE_TYPE_CD, type: VARCHAR2, display: "서비스유형코드" }
+            - { name: IS_ACTIVE, type: NUMBER, display: "활성여부", default: "1" }
+        cdc-table:
+          asis: CDC_ASIS_NEW_SERVICE
+        staging-table:
+          asis: STAGING_ASIS_NEW_SERVICE
 
 # ==============================================
 # 로깅 설정
