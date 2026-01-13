@@ -1,0 +1,53 @@
+-- ============================================
+-- ASIS Oracle 초기화 스크립트
+-- 03. 매핑 테이블 생성 및 데이터 입력
+-- ============================================
+
+-- 코드 매핑 테이블
+CREATE TABLE SYNC_CODE_MAPPING (
+    MAP_GROUP       VARCHAR2(50),
+    SOURCE_SYSTEM   VARCHAR2(10),
+    SOURCE_VALUE    VARCHAR2(100),
+    TARGET_SYSTEM   VARCHAR2(10),
+    TARGET_VALUE    VARCHAR2(100),
+    DESCRIPTION     VARCHAR2(200),
+    PRIMARY KEY (MAP_GROUP, SOURCE_SYSTEM, SOURCE_VALUE)
+);
+
+-- 카테고리 코드 매핑 (TOBE → ASIS)
+INSERT INTO SYNC_CODE_MAPPING VALUES ('CATEGORY_MAP', 'TOBE', 'LIT', 'ASIS', '01', '문학');
+INSERT INTO SYNC_CODE_MAPPING VALUES ('CATEGORY_MAP', 'TOBE', 'SCI', 'ASIS', '02', '과학');
+INSERT INTO SYNC_CODE_MAPPING VALUES ('CATEGORY_MAP', 'TOBE', 'HIS', 'ASIS', '03', '역사');
+
+-- 상태 코드 매핑 (TOBE → ASIS)
+INSERT INTO SYNC_CODE_MAPPING VALUES ('STATUS_MAP', 'TOBE', '1', 'ASIS', 'Y', '활성');
+INSERT INTO SYNC_CODE_MAPPING VALUES ('STATUS_MAP', 'TOBE', '0', 'ASIS', 'N', '비활성');
+
+-- 회원 유형 코드 매핑 (TOBE → ASIS)
+INSERT INTO SYNC_CODE_MAPPING VALUES ('MEMBER_TYPE_MAP', 'TOBE', 'ADMIN', 'ASIS', 'A', '관리자');
+INSERT INTO SYNC_CODE_MAPPING VALUES ('MEMBER_TYPE_MAP', 'TOBE', 'USER', 'ASIS', 'B', '일반');
+INSERT INTO SYNC_CODE_MAPPING VALUES ('MEMBER_TYPE_MAP', 'TOBE', 'GUEST', 'ASIS', 'C', '게스트');
+
+COMMIT;
+
+-- 코드 변환 함수
+CREATE OR REPLACE FUNCTION FN_CONVERT_CODE(
+    p_map_group   VARCHAR2,
+    p_source_sys  VARCHAR2,
+    p_source_val  VARCHAR2
+) RETURN VARCHAR2
+IS
+    v_target_val VARCHAR2(100);
+BEGIN
+    SELECT TARGET_VALUE INTO v_target_val
+    FROM SYNC_CODE_MAPPING
+    WHERE MAP_GROUP = p_map_group
+      AND SOURCE_SYSTEM = p_source_sys
+      AND SOURCE_VALUE = p_source_val;
+
+    RETURN v_target_val;
+EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+        RETURN p_source_val;  -- 매핑 없으면 원본값 반환
+END;
+/

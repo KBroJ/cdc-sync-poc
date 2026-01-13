@@ -1,0 +1,106 @@
+# ==============================================
+# CDC Sync Service 설정
+# ==============================================
+
+server:
+  port: 8080
+
+spring:
+  application:
+    name: cdc-sync-service
+
+  # Kafka 설정
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:29092}
+    consumer:
+      group-id: cdc-sync-service
+      auto-offset-reset: earliest
+      enable-auto-commit: true
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      # JSON 메시지 처리를 위한 설정
+      properties:
+        spring.json.trusted.packages: "*"
+
+# ==============================================
+# 데이터소스 설정
+# ==============================================
+
+# ASIS DB 설정
+asis:
+  datasource:
+    jdbc-url: jdbc:oracle:thin:@${ASIS_DB_HOST:asis-oracle}:${ASIS_DB_PORT:1521}/${ASIS_DB_SERVICE:XEPDB1}
+    username: ${ASIS_DB_USER:asis_user}
+    password: ${ASIS_DB_PASSWORD:asis123}
+    driver-class-name: oracle.jdbc.OracleDriver
+    pool-name: ASIS-Pool
+    maximum-pool-size: 5
+    minimum-idle: 2
+    connection-timeout: 30000
+
+# TOBE DB 설정
+tobe:
+  datasource:
+    jdbc-url: jdbc:oracle:thin:@${TOBE_DB_HOST:tobe-oracle}:${TOBE_DB_PORT:1521}/${TOBE_DB_SERVICE:XEPDB1}
+    username: ${TOBE_DB_USER:tobe_user}
+    password: ${TOBE_DB_PASSWORD:tobe123}
+    driver-class-name: oracle.jdbc.OracleDriver
+    pool-name: TOBE-Pool
+    maximum-pool-size: 5
+    minimum-idle: 2
+    connection-timeout: 30000
+
+# ==============================================
+# CDC 동기화 설정
+# ==============================================
+
+cdc:
+  sync:
+    # ASIS -> TOBE 매핑 (ASIS 테이블 변경 -> TOBE CDC 테이블에 INSERT)
+    asis-to-tobe:
+      - source-topic: asis.ASIS_USER.LEGACY_CODE
+        target-table: CDC_TOBE_LEGACY_CODE
+      - source-topic: asis.ASIS_USER.BOOK_INFO
+        target-table: CDC_TOBE_BOOK
+      - source-topic: asis.ASIS_USER.MEMBER_INFO
+        target-table: CDC_TOBE_MEMBER
+
+    # TOBE -> ASIS 매핑 (TOBE 테이블 변경 -> ASIS CDC 테이블에 INSERT)
+    tobe-to-asis:
+      - source-topic: tobe.TOBE_USER.TB_BOOK
+        target-table: CDC_ASIS_BOOK
+      - source-topic: tobe.TOBE_USER.TB_MEMBER
+        target-table: CDC_ASIS_MEMBER
+      - source-topic: tobe.TOBE_USER.TB_NEW_SERVICE
+        target-table: CDC_ASIS_NEW_SERVICE
+
+# ==============================================
+# 로깅 설정
+# ==============================================
+
+logging:
+  level:
+    root: INFO
+    com.cdc.sync: DEBUG
+    org.springframework.kafka: INFO
+    org.apache.kafka: WARN
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+
+# ==============================================
+# Actuator 설정 (Health Check)
+# ==============================================
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+  health:
+    kafka:
+      enabled: true
+    db:
+      enabled: false

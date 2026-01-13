@@ -1,0 +1,28 @@
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# Build
+target/
+*.class
+*.jar
+!poc/kafka-connect/libs/ojdbc11.jar
+
+# Logs
+*.log
+logs/
+
+# Temp files
+tmpclaude-*
+nul
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker volumes (if any local)
+data/
+
+# Claude settings (local)
+.claude/

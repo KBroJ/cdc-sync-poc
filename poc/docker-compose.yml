@@ -1,0 +1,162 @@
+services:
+  # ===== ASIS Oracle XE =====
+  asis-oracle:
+    image: gvenzl/oracle-xe:21-slim
+    container_name: asis-oracle
+    environment:
+      ORACLE_PASSWORD: oracle123
+      APP_USER: asis_user
+      APP_USER_PASSWORD: asis123
+    ports:
+      - "1521:1521"
+    volumes:
+      - asis-oracle-data:/opt/oracle/oradata
+      - ./asis-oracle/init:/container-entrypoint-initdb.d
+    networks:
+      - cdc-net
+    healthcheck:
+      test: ["CMD", "healthcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+
+  # ===== TOBE Oracle XE =====
+  tobe-oracle:
+    image: gvenzl/oracle-xe:21-slim
+    container_name: tobe-oracle
+    environment:
+      ORACLE_PASSWORD: oracle123
+      APP_USER: tobe_user
+      APP_USER_PASSWORD: tobe123
+    ports:
+      - "1522:1521"
+    volumes:
+      - tobe-oracle-data:/opt/oracle/oradata
+      - ./tobe-oracle/init:/container-entrypoint-initdb.d
+    networks:
+      - cdc-net
+    healthcheck:
+      test: ["CMD", "healthcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+
+  # ===== Zookeeper =====
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    # ports:
+    #   - "2181:2181"  # 내부 통신만 사용, 외부 노출 불필요
+    networks:
+      - cdc-net
+
+  # ===== Kafka =====
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+    networks:
+      - cdc-net
+
+  # ===== Kafka Connect (Debezium) =====
+  kafka-connect:
+    image: debezium/connect:2.4
+    container_name: kafka-connect
+    depends_on:
+      - kafka
+    ports:
+      - "8083:8083"
+    volumes:
+      - ./kafka-connect/libs/ojdbc11.jar:/kafka/libs/ojdbc11.jar
+    environment:
+      BOOTSTRAP_SERVERS: kafka:29092
+      GROUP_ID: cdc-connect-cluster
+      CONFIG_STORAGE_TOPIC: cdc_connect_configs
+      OFFSET_STORAGE_TOPIC: cdc_connect_offsets
+      STATUS_STORAGE_TOPIC: cdc_connect_statuses
+      CONFIG_STORAGE_REPLICATION_FACTOR: 1
+      OFFSET_STORAGE_REPLICATION_FACTOR: 1
+      STATUS_STORAGE_REPLICATION_FACTOR: 1
+      KEY_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      KEY_CONVERTER_SCHEMAS_ENABLE: "false"
+      VALUE_CONVERTER_SCHEMAS_ENABLE: "false"
+    networks:
+      - cdc-net
+
+  # ===== CDC Sync Service (Java/Spring Boot) =====
+  sync-service:
+    build: ./sync-service-java
+    image: poc-sync-service-java
+    container_name: sync-service
+    depends_on:
+      - kafka
+      - asis-oracle
+      - tobe-oracle
+    ports:
+      - "8082:8080"
+    environment:
+      # Kafka 설정
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      # ASIS DB 설정
+      ASIS_DB_HOST: asis-oracle
+      ASIS_DB_PORT: 1521
+      ASIS_DB_SERVICE: XEPDB1
+      ASIS_DB_USER: asis_user
+      ASIS_DB_PASSWORD: asis123
+      # TOBE DB 설정
+      TOBE_DB_HOST: tobe-oracle
+      TOBE_DB_PORT: 1521
+      TOBE_DB_SERVICE: XEPDB1
+      TOBE_DB_USER: tobe_user
+      TOBE_DB_PASSWORD: tobe123
+    networks:
+      - cdc-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # ===== Kafka UI (모니터링) =====
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: kafka-ui
+    depends_on:
+      - kafka
+      - kafka-connect
+    ports:
+      - "8081:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: cdc-cluster
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+      KAFKA_CLUSTERS_0_KAFKACONNECT_0_NAME: debezium
+      KAFKA_CLUSTERS_0_KAFKACONNECT_0_ADDRESS: http://kafka-connect:8083
+    networks:
+      - cdc-net
+
+volumes:
+  asis-oracle-data:
+  tobe-oracle-data:
+
+networks:
+  cdc-net:
+    driver: bridge
