@@ -266,6 +266,7 @@
             border-bottom: 1px solid #333;
         }
         tr:hover td { background: #1a1a2e; }
+        tr[onclick]:hover td { background: #0d4d6d; cursor: pointer; }
 
         /* 상태 배지 */
         .status-badge {
@@ -278,6 +279,8 @@
         .status-failed { background: rgba(255, 71, 87, 0.2); color: #ff4757; }
         .status-pending { background: rgba(255, 165, 2, 0.2); color: #ffa502; }
         .status-blocked { background: rgba(108, 92, 231, 0.2); color: #6c5ce7; }
+        .status-loop_blocked { background: rgba(108, 92, 231, 0.2); color: #6c5ce7; }
+        .status-target_not_found { background: rgba(255, 193, 7, 0.2); color: #ffc107; }
 
         .op-badge {
             padding: 2px 8px;
@@ -537,6 +540,27 @@
             <strong>동기화 흐름 확인:</strong> 테스트 실행 후 각 단계별 데이터 상태를 확인할 수 있습니다. WORKER는 5초마다 자동 실행됩니다.
         </div>
 
+        <!-- 흐름 조회 컨트롤 바 -->
+        <div class="flow-controls" style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px; padding: 12px 15px; background: #16213e; border-radius: 8px;">
+            <button class="btn btn-primary" onclick="loadAllFlowData()" id="btnRefreshAll">
+                전체 새로고침
+            </button>
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <label style="color: #888; font-size: 0.9em;">자동 새로고침:</label>
+                <button class="btn btn-secondary" onclick="toggleAutoRefresh()" id="btnAutoRefresh" style="min-width: 60px;">
+                    OFF
+                </button>
+                <select id="refreshInterval" style="background: #0d0d1a; border: 1px solid #333; color: #fff; padding: 6px 10px; border-radius: 4px;" onchange="updateRefreshInterval()">
+                    <option value="3000">3초</option>
+                    <option value="5000" selected>5초</option>
+                    <option value="10000">10초</option>
+                </select>
+            </div>
+            <span id="lastRefreshTime" style="color: #666; font-size: 0.85em; margin-left: auto;">
+                마지막 조회: -
+            </span>
+        </div>
+
         <!-- ASIS -> TOBE 흐름 -->
         <div class="section" th:if="${selectedTable.asisTestable}">
             <div class="section-title" style="color: #00ff88;">구 -> 신 동기화 흐름</div>
@@ -544,28 +568,24 @@
                 <div class="flow-step">
                     <div class="flow-step-title">1. ASIS 원본</div>
                     <div class="flow-step-table" th:text="${selectedTable.asis.table}">BOOK_INFO</div>
-                    <button class="btn btn-secondary" onclick="loadFlowData('asis', 'source')">조회</button>
                     <div id="flow-asis-source" class="table-wrapper" style="margin-top:10px; max-height:150px;"></div>
                 </div>
                 <div class="flow-arrow">-></div>
                 <div class="flow-step">
                     <div class="flow-step-title">2. CDC 테이블</div>
                     <div class="flow-step-table" th:text="${selectedTable.cdcTable?.tobe}">CDC_TOBE_BOOK</div>
-                    <button class="btn btn-secondary" onclick="loadFlowData('tobe', 'cdc')">조회</button>
                     <div id="flow-tobe-cdc" class="table-wrapper" style="margin-top:10px; max-height:150px;"></div>
                 </div>
                 <div class="flow-arrow">-></div>
                 <div class="flow-step">
                     <div class="flow-step-title">3. STAGING 테이블</div>
                     <div class="flow-step-table" th:text="${selectedTable.stagingTable?.tobe}">STAGING_TOBE_BOOK</div>
-                    <button class="btn btn-secondary" onclick="loadFlowData('tobe', 'staging')">조회</button>
                     <div id="flow-tobe-staging" class="table-wrapper" style="margin-top:10px; max-height:150px;"></div>
                 </div>
                 <div class="flow-arrow">-></div>
                 <div class="flow-step">
                     <div class="flow-step-title">4. TOBE 원본</div>
                     <div class="flow-step-table" th:text="${selectedTable.tobe.table}">TB_BOOK</div>
-                    <button class="btn btn-secondary" onclick="loadFlowData('tobe', 'source')">조회</button>
                     <div id="flow-tobe-source" class="table-wrapper" style="margin-top:10px; max-height:150px;"></div>
                 </div>
             </div>
@@ -578,28 +598,24 @@
                 <div class="flow-step">
                     <div class="flow-step-title">1. TOBE 원본</div>
                     <div class="flow-step-table" th:text="${selectedTable.tobe.table}">TB_BOOK</div>
-                    <button class="btn btn-secondary" onclick="loadFlowData('tobe', 'source')">조회</button>
                     <div id="flow-tobe-source2" class="table-wrapper" style="margin-top:10px; max-height:150px;"></div>
                 </div>
                 <div class="flow-arrow">-></div>
                 <div class="flow-step">
                     <div class="flow-step-title">2. CDC 테이블</div>
                     <div class="flow-step-table" th:text="${selectedTable.cdcTable?.asis}">CDC_ASIS_BOOK</div>
-                    <button class="btn btn-secondary" onclick="loadFlowData('asis', 'cdc')">조회</button>
                     <div id="flow-asis-cdc" class="table-wrapper" style="margin-top:10px; max-height:150px;"></div>
                 </div>
                 <div class="flow-arrow">-></div>
                 <div class="flow-step">
                     <div class="flow-step-title">3. STAGING 테이블</div>
                     <div class="flow-step-table" th:text="${selectedTable.stagingTable?.asis}">STAGING_ASIS_BOOK</div>
-                    <button class="btn btn-secondary" onclick="loadFlowData('asis', 'staging')">조회</button>
                     <div id="flow-asis-staging" class="table-wrapper" style="margin-top:10px; max-height:150px;"></div>
                 </div>
                 <div class="flow-arrow">-></div>
                 <div class="flow-step">
                     <div class="flow-step-title">4. ASIS 원본</div>
                     <div class="flow-step-table" th:text="${selectedTable.asis.table}">BOOK_INFO</div>
-                    <button class="btn btn-secondary" onclick="loadFlowData('asis', 'source')">조회</button>
                     <div id="flow-asis-source2" class="table-wrapper" style="margin-top:10px; max-height:150px;"></div>
                 </div>
             </div>
@@ -675,9 +691,18 @@
             document.getElementById('tab-' + tabName).classList.add('active');
             event.target.classList.add('active');
 
-            if (tabName === 'history') {
+            // 탭별 데이터 로드
+            if (tabName === 'flow') {
+                // 동기화 흐름 탭: 전체 데이터 자동 로드
+                loadAllFlowData();
+            } else if (tabName === 'history') {
                 loadSyncLog();
                 loadStats();
+            }
+
+            // flow 탭이 아니면 자동 새로고침 중지
+            if (tabName !== 'flow' && autoRefreshEnabled) {
+                toggleAutoRefresh(); // OFF로 전환
             }
         }
 
@@ -773,8 +798,11 @@
 
                 if (result.success && result.data && result.data.length > 0) {
                     const columns = db === 'asis' ? asisColumns : tobeColumns;
-                    tbody.innerHTML = result.data.map(row => {
-                        return '<tr>' + columns.map(col => `<td>${row[col.name] ?? '-'}</td>`).join('') + '</tr>';
+                    tbody.innerHTML = result.data.map((row, idx) => {
+                        // 행 클릭 시 입력 폼에 자동 세팅 (JSON 이스케이프)
+                        const rowJson = JSON.stringify(row).replace(/'/g, "\\'");
+                        return `<tr style="cursor:pointer;" onclick="fillInputFromRow('${db}', '${rowJson}')" title="클릭하여 입력 폼에 세팅">` +
+                            columns.map(col => `<td>${row[col.name] ?? '-'}</td>`).join('') + '</tr>';
                     }).join('');
                 } else {
                     const colCount = db === 'asis' ? asisColumns.length : tobeColumns.length;
@@ -782,6 +810,35 @@
                 }
             } catch (error) {
                 console.error(`${db} 데이터 로딩 실패:`, error);
+            }
+        }
+
+        /**
+         * 테이블 행 클릭 시 입력 폼에 자동 세팅
+         * @param {string} db - 'asis' 또는 'tobe'
+         * @param {string} rowJson - JSON 문자열로 인코딩된 행 데이터
+         */
+        function fillInputFromRow(db, rowJson) {
+            try {
+                const row = JSON.parse(rowJson);
+                const columns = db === 'asis' ? asisColumns : tobeColumns;
+
+                columns.forEach(col => {
+                    const input = document.getElementById(db + '_' + col.name);
+                    if (input && row[col.name] !== undefined && row[col.name] !== null) {
+                        input.value = row[col.name];
+                    }
+                });
+
+                // 시각적 피드백
+                const panel = document.querySelector(`#tab-test .grid-2 > div:${db === 'asis' ? 'first' : 'last'}-child .test-panel`);
+                if (panel) {
+                    panel.style.transition = 'box-shadow 0.3s';
+                    panel.style.boxShadow = '0 0 10px #00d4ff';
+                    setTimeout(() => panel.style.boxShadow = '', 500);
+                }
+            } catch (e) {
+                console.error('입력 폼 세팅 실패:', e);
             }
         }
 
@@ -826,6 +883,116 @@
                 }
             } catch (error) {
                 container.innerHTML = `<p class="no-data">로드 실패</p>`;
+            }
+        }
+
+        // ============================================================
+        // 전체 새로고침 및 자동 새로고침 기능
+        // 학습 포인트: Promise.all을 사용한 병렬 API 호출
+        // ============================================================
+
+        // 자동 새로고침 상태 관리
+        let autoRefreshEnabled = false;
+        let autoRefreshTimer = null;
+
+        /**
+         * 전체 흐름 데이터 한번에 조회
+         * - ASIS→TOBE 방향: asis/source → tobe/cdc → tobe/staging → tobe/source
+         * - TOBE→ASIS 방향: tobe/source → asis/cdc → asis/staging → asis/source
+         *
+         * Promise.all 사용 이유:
+         * - 4개 API를 순차 호출하면 약 200ms x 4 = 800ms
+         * - 병렬 호출하면 약 200ms (가장 느린 것 기준)
+         */
+        async function loadAllFlowData() {
+            const btn = document.getElementById('btnRefreshAll');
+            btn.textContent = '조회 중...';
+            btn.disabled = true;
+
+            try {
+                // 방향에 따라 조회할 항목 결정
+                const asisTestable = /*[[${selectedTable.asisTestable}]]*/ true;
+                const tobeTestable = /*[[${selectedTable.tobeTestable}]]*/ true;
+
+                const promises = [];
+
+                // ASIS → TOBE 흐름 (구→신)
+                if (asisTestable) {
+                    promises.push(
+                        loadFlowData('asis', 'source'),
+                        loadFlowData('tobe', 'cdc'),
+                        loadFlowData('tobe', 'staging'),
+                        loadFlowData('tobe', 'source')
+                    );
+                }
+
+                // TOBE → ASIS 흐름 (신→구)
+                if (tobeTestable) {
+                    promises.push(
+                        loadFlowData('tobe', 'source'),
+                        loadFlowData('asis', 'cdc'),
+                        loadFlowData('asis', 'staging'),
+                        loadFlowData('asis', 'source')
+                    );
+                }
+
+                // 모든 API 병렬 호출
+                await Promise.all(promises);
+
+                // 마지막 조회 시간 표시
+                const now = new Date();
+                const timeStr = now.toLocaleTimeString('ko-KR');
+                document.getElementById('lastRefreshTime').textContent = `마지막 조회: ${timeStr}`;
+
+            } catch (error) {
+                console.error('전체 조회 실패:', error);
+            } finally {
+                btn.textContent = '전체 새로고침';
+                btn.disabled = false;
+            }
+        }
+
+        /**
+         * 자동 새로고침 토글
+         * 학습 포인트: setInterval/clearInterval을 사용한 주기적 실행
+         */
+        function toggleAutoRefresh() {
+            autoRefreshEnabled = !autoRefreshEnabled;
+            const btn = document.getElementById('btnAutoRefresh');
+
+            if (autoRefreshEnabled) {
+                btn.textContent = 'ON';
+                btn.style.background = '#00d4ff';
+                btn.style.color = '#1a1a2e';
+
+                // 즉시 한번 실행
+                loadAllFlowData();
+
+                // 주기적 실행 시작
+                const interval = parseInt(document.getElementById('refreshInterval').value);
+                autoRefreshTimer = setInterval(loadAllFlowData, interval);
+            } else {
+                btn.textContent = 'OFF';
+                btn.style.background = '#444';
+                btn.style.color = '#fff';
+
+                // 타이머 중지
+                if (autoRefreshTimer) {
+                    clearInterval(autoRefreshTimer);
+                    autoRefreshTimer = null;
+                }
+            }
+        }
+
+        /**
+         * 새로고침 간격 변경
+         * 자동 새로고침 중이면 타이머 재설정
+         */
+        function updateRefreshInterval() {
+            if (autoRefreshEnabled && autoRefreshTimer) {
+                clearInterval(autoRefreshTimer);
+                const interval = parseInt(document.getElementById('refreshInterval').value);
+                autoRefreshTimer = setInterval(loadAllFlowData, interval);
             }
         }
 
