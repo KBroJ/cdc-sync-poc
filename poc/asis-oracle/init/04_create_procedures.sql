@@ -81,6 +81,7 @@ IS
     v_hash VARCHAR2(64);
     v_is_loop BOOLEAN;
     v_err_msg VARCHAR2(500);
+    v_rowcount NUMBER;  -- TARGET_NOT_FOUND 체크용
 BEGIN
     -- 1단계: CDC → STAGING (스키마 변환)
     FOR rec IN (
@@ -161,8 +162,12 @@ BEGIN
                         MOD_DATE = rec.MOD_DATE
                     WHERE BOOK_ID = rec.BOOK_ID;
 
+                    v_rowcount := SQL%ROWCOUNT;
+
                 WHEN 'DELETE' THEN
                     DELETE FROM BOOK_INFO WHERE BOOK_ID = rec.BOOK_ID;
+
+                    v_rowcount := SQL%ROWCOUNT;
             END CASE;
 
             UPDATE STAGING_ASIS_BOOK
@@ -175,8 +180,15 @@ BEGIN
                                        rec.BOOK_TITLE || rec.AUTHOR || rec.CATEGORY || rec.STATUS);
             SP_RECORD_HASH(v_hash, 'BOOK_INFO', TO_CHAR(rec.BOOK_ID));
 
-            INSERT INTO CDC_SYNC_LOG (DIRECTION, TABLE_NAME, OPERATION, PK_VALUE, STATUS)
-            VALUES ('TOBE_TO_ASIS', 'BOOK_INFO', rec.OPERATION, TO_CHAR(rec.BOOK_ID), 'SUCCESS');
+            -- TARGET_NOT_FOUND 체크 (UPDATE/DELETE 시 대상이 없는 경우)
+            IF rec.OPERATION IN ('UPDATE', 'DELETE') AND v_rowcount = 0 THEN
+                INSERT INTO CDC_SYNC_LOG (DIRECTION, TABLE_NAME, OPERATION, PK_VALUE, STATUS, ERROR_MSG)
+                VALUES ('TOBE_TO_ASIS', 'BOOK_INFO', rec.OPERATION, TO_CHAR(rec.BOOK_ID), 'TARGET_NOT_FOUND',
+                        '대상이 존재하지 않음 (BOOK_ID=' || rec.BOOK_ID || ')');
+            ELSE
+                INSERT INTO CDC_SYNC_LOG (DIRECTION, TABLE_NAME, OPERATION, PK_VALUE, STATUS)
+                VALUES ('TOBE_TO_ASIS', 'BOOK_INFO', rec.OPERATION, TO_CHAR(rec.BOOK_ID), 'SUCCESS');
+            END IF;
 
             COMMIT;
         EXCEPTION

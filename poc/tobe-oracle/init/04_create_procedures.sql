@@ -144,6 +144,7 @@ CREATE OR REPLACE PROCEDURE SP_WORKER_BOOK
 IS
     v_hash VARCHAR2(64);
     v_err_msg VARCHAR2(500);
+    v_rowcount NUMBER;  -- TARGET_NOT_FOUND 체크용
 BEGIN
     -- 1단계: CDC → STAGING (스키마 변환: ASIS→TOBE)
     FOR rec IN (
@@ -192,8 +193,13 @@ BEGIN
                 WHEN 'UPDATE' THEN
                     UPDATE TB_BOOK SET TITLE = rec.TITLE, AUTHOR_NAME = rec.AUTHOR_NAME, CATEGORY_CD = rec.CATEGORY_CD,
                            IS_ACTIVE = rec.IS_ACTIVE, UPDATED_AT = rec.UPDATED_AT WHERE BOOK_ID = rec.BOOK_ID;
+
+                    v_rowcount := SQL%ROWCOUNT;
+
                 WHEN 'DELETE' THEN
                     DELETE FROM TB_BOOK WHERE BOOK_ID = rec.BOOK_ID;
+
+                    v_rowcount := SQL%ROWCOUNT;
             END CASE;
             UPDATE STAGING_TOBE_BOOK SET PROCESSED_YN = 'Y', PROCESSED_AT = SYSTIMESTAMP WHERE STAGING_SEQ = rec.STAGING_SEQ;
 
@@ -201,8 +207,15 @@ BEGIN
             v_hash := FN_GENERATE_HASH('TB_BOOK', TO_CHAR(rec.BOOK_ID), rec.OPERATION, rec.TITLE || rec.AUTHOR_NAME || rec.CATEGORY_CD);
             SP_RECORD_HASH(v_hash, 'TB_BOOK', TO_CHAR(rec.BOOK_ID));
 
-            INSERT INTO CDC_SYNC_LOG (DIRECTION, TABLE_NAME, OPERATION, PK_VALUE, STATUS)
-            VALUES ('ASIS_TO_TOBE', 'TB_BOOK', rec.OPERATION, TO_CHAR(rec.BOOK_ID), 'SUCCESS');
+            -- TARGET_NOT_FOUND 체크 (UPDATE/DELETE 시 대상이 없는 경우)
+            IF rec.OPERATION IN ('UPDATE', 'DELETE') AND v_rowcount = 0 THEN
+                INSERT INTO CDC_SYNC_LOG (DIRECTION, TABLE_NAME, OPERATION, PK_VALUE, STATUS, ERROR_MSG)
+                VALUES ('ASIS_TO_TOBE', 'TB_BOOK', rec.OPERATION, TO_CHAR(rec.BOOK_ID), 'TARGET_NOT_FOUND',
+                        '대상이 존재하지 않음 (BOOK_ID=' || rec.BOOK_ID || ')');
+            ELSE
+                INSERT INTO CDC_SYNC_LOG (DIRECTION, TABLE_NAME, OPERATION, PK_VALUE, STATUS)
+                VALUES ('ASIS_TO_TOBE', 'TB_BOOK', rec.OPERATION, TO_CHAR(rec.BOOK_ID), 'SUCCESS');
+            END IF;
             COMMIT;
         EXCEPTION
             WHEN DUP_VAL_ON_INDEX THEN
