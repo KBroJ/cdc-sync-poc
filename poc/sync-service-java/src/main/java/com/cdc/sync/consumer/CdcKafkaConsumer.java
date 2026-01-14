@@ -1,6 +1,6 @@
 package com.cdc.sync.consumer;
 
-import com.cdc.sync.model.CdcEvent;
+import com.cdc.sync.domain.CdcEvent;
 import com.cdc.sync.service.CdcSyncService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -14,18 +14,28 @@ import org.springframework.stereotype.Component;
 import java.util.Map;
 
 /**
- * CDC Kafka Consumer
+ * CDC Kafka Consumer (메시지 수신 레이어)
  *
- * Debezium이 발행한 CDC 이벤트를 수신하여 처리합니다.
+ * [설계 의도]
+ * - Debezium이 발행한 CDC 이벤트를 수신하여 Service 레이어에 전달
+ * - 메시지 파싱 로직을 Consumer에 캡슐화
+ * - @KafkaListener: Spring Kafka의 선언적 리스너
  *
- * 구독 토픽:
- *   - ASIS 토픽: asis.ASIS_USER.* (BOOK_INFO, MEMBER_INFO, LEGACY_CODE)
- *   - TOBE 토픽: tobe.TOBE_USER.* (TB_BOOK, TB_MEMBER, TB_NEW_SERVICE)
+ * [구독 토픽]
+ * - ASIS 토픽: asis.ASIS_USER.* (BOOK_INFO, MEMBER_INFO, LEGACY_CODE)
+ * - TOBE 토픽: tobe.TOBE_USER.* (TB_BOOK, TB_MEMBER, TB_NEW_SERVICE)
  *
- * 처리 흐름:
- *   1. Kafka 메시지 수신
- *   2. JSON 파싱 -> CdcEvent 변환
- *   3. 토픽에 따라 대상 DB CDC 테이블에 INSERT
+ * [처리 흐름]
+ * 1. Kafka 메시지 수신
+ * 2. JSON 파싱 → CdcEvent 변환
+ * 3. 토픽에 따라 CdcSyncService 호출
+ * 4. Service가 상대 DB CDC 테이블에 INSERT
+ *
+ * [프로덕션 고려사항]
+ * - 에러 처리: Dead Letter Queue 적용
+ * - 재시도: @Retryable 또는 Kafka RetryTemplate
+ * - 배치 처리: @KafkaListener(batch = true)
+ * - 동적 토픽: 토픽 패턴 매칭 또는 동적 등록
  */
 @Component
 public class CdcKafkaConsumer {
@@ -101,7 +111,7 @@ public class CdcKafkaConsumer {
     // ===========================================
 
     /**
-     * ASIS 이벤트 처리 (-> TOBE DB로 전송)
+     * ASIS 이벤트 처리 (→ TOBE DB로 전송)
      */
     private void processAsisEvent(ConsumerRecord<String, String> record, String targetTable) {
         String topic = record.topic();
@@ -116,7 +126,7 @@ public class CdcKafkaConsumer {
     }
 
     /**
-     * TOBE 이벤트 처리 (-> ASIS DB로 전송)
+     * TOBE 이벤트 처리 (→ ASIS DB로 전송)
      */
     private void processTobeEvent(ConsumerRecord<String, String> record, String targetTable) {
         String topic = record.topic();
@@ -133,7 +143,17 @@ public class CdcKafkaConsumer {
     /**
      * Debezium 메시지 파싱
      *
-     * Debezium JSON 메시지를 CdcEvent 객체로 변환합니다.
+     * [Debezium JSON 구조]
+     * {
+     *   "schema": { ... },
+     *   "payload": {
+     *     "before": { ... },
+     *     "after": { ... },
+     *     "source": { ... },
+     *     "op": "c|u|d|r",
+     *     "ts_ms": 1234567890123
+     *   }
+     * }
      *
      * @param message JSON 문자열
      * @return CdcEvent 객체

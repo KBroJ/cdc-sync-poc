@@ -1,7 +1,6 @@
 package com.cdc.sync.service;
 
-import com.cdc.sync.model.CdcEvent;
-import com.cdc.sync.monitoring.CdcMonitoringService;
+import com.cdc.sync.domain.CdcEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -17,14 +16,29 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * CDC 동기화 서비스
+ * CDC 동기화 서비스 (핵심 비즈니스 로직)
  *
- * CDC 이벤트를 수신하여 상대 DB의 CDC 테이블에 INSERT합니다.
+ * [설계 의도]
+ * - CDC 이벤트를 수신하여 상대 DB의 CDC 테이블에 INSERT
+ * - 비즈니스 로직을 Service 레이어에 집중
+ * - 데이터 접근은 JdbcTemplate 직접 사용 (프로덕션에서는 Repository 분리 권장)
  *
- * 주요 기능:
- *   - ASIS 이벤트 -> TOBE DB CDC 테이블 INSERT
- *   - TOBE 이벤트 -> ASIS DB CDC 테이블 INSERT
- *   - 변경 데이터 해시 생성 (무한루프 방지용)
+ * [동기화 흐름]
+ * 1. Kafka Consumer가 Debezium 이벤트 수신
+ * 2. 이 서비스의 syncAsisToTobe() 또는 syncTobeToAsis() 호출
+ * 3. 상대 DB의 CDC 테이블에 INSERT
+ * 4. DB Worker(프로시저)가 CDC 테이블 → 원본 테이블 반영 (별도 구현)
+ *
+ * [주요 기능]
+ * - ASIS 이벤트 → TOBE DB CDC 테이블 INSERT
+ * - TOBE 이벤트 → ASIS DB CDC 테이블 INSERT
+ * - 변경 데이터 해시 생성 (무한루프 방지용)
+ * - Debezium 특수 타입 변환 (NUMBER, TIMESTAMP)
+ *
+ * [프로덕션 고려사항]
+ * - 트랜잭션 관리: @Transactional 적용
+ * - 재시도 로직: Spring Retry 또는 Kafka offset 관리
+ * - 배치 처리: 대량 이벤트 시 bulk insert 고려
  */
 @Service
 public class CdcSyncService {
@@ -35,6 +49,13 @@ public class CdcSyncService {
     private final JdbcTemplate tobeJdbcTemplate;
     private final CdcMonitoringService monitoringService;
 
+    /**
+     * 생성자 주입 (Constructor Injection)
+     *
+     * [설계 의도]
+     * - @Qualifier: 다중 DataSource 환경에서 특정 Bean 지정
+     * - 생성자 주입: 불변성 보장, 테스트 용이성
+     */
     public CdcSyncService(
             @Qualifier("asisJdbcTemplate") JdbcTemplate asisJdbcTemplate,
             @Qualifier("tobeJdbcTemplate") JdbcTemplate tobeJdbcTemplate,
@@ -68,6 +89,14 @@ public class CdcSyncService {
 
     /**
      * CDC 테이블에 INSERT 실행
+     *
+     * [처리 흐름]
+     * 1. 모니터링: 수신 기록
+     * 2. 데이터 검증
+     * 3. 동적 INSERT SQL 생성
+     * 4. Debezium 특수 타입 변환
+     * 5. SQL 실행
+     * 6. 모니터링: 성공/실패 기록
      *
      * @param jdbcTemplate 대상 DB JdbcTemplate
      * @param event CDC 이벤트
@@ -206,10 +235,10 @@ public class CdcSyncService {
     /**
      * Debezium 타임스탬프를 java.sql.Timestamp로 변환
      *
-     * Debezium은 Oracle DATE/TIMESTAMP를 다양한 형식으로 전송합니다:
-     *   - io.debezium.time.MicroTimestamp: 마이크로초 (나누기 1000 필요)
-     *   - io.debezium.time.Timestamp: 밀리초
-     *   - io.debezium.time.Date: epoch days (곱하기 86400000 필요)
+     * [Debezium 타임스탬프 형식]
+     * - io.debezium.time.MicroTimestamp: 마이크로초 (나누기 1000 필요)
+     * - io.debezium.time.Timestamp: 밀리초
+     * - io.debezium.time.Date: epoch days (곱하기 86400000 필요)
      *
      * @param epochValue epoch 값 (마이크로초, 밀리초, 또는 일수)
      * @return java.sql.Timestamp
@@ -238,8 +267,9 @@ public class CdcSyncService {
     /**
      * Debezium NUMBER 타입 디코딩
      *
-     * Debezium은 Oracle NUMBER를 다음 형식으로 전송합니다:
-     *   { "scale": 0, "value": "AQ==" }  (Base64 인코딩된 BigInteger)
+     * [Debezium NUMBER 형식]
+     * Oracle NUMBER를 다음 형식으로 전송:
+     * { "scale": 0, "value": "AQ==" }  (Base64 인코딩된 BigInteger)
      *
      * @param complexValue Debezium 복합 값
      * @return 디코딩된 숫자
@@ -269,7 +299,9 @@ public class CdcSyncService {
     /**
      * 데이터 해시 생성 (SHA-256)
      *
-     * 무한루프 방지를 위해 변경 데이터의 해시를 생성합니다.
+     * [설계 의도]
+     * - 무한루프 방지: 동일 데이터의 재처리 감지
+     * - CDC 테이블에 해시 저장 후 Worker에서 중복 체크
      *
      * @param data 데이터 맵
      * @return SHA-256 해시 문자열

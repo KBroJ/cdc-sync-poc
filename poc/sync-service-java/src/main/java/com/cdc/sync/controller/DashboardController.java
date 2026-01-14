@@ -1,4 +1,4 @@
-package com.cdc.sync.monitoring;
+package com.cdc.sync.controller;
 
 import com.cdc.sync.config.CdcSimulatorConfig;
 import org.springframework.stereotype.Controller;
@@ -9,7 +9,14 @@ import org.springframework.web.bind.annotation.RequestParam;
 /**
  * CDC 동기화 시뮬레이터 대시보드 컨트롤러
  *
- * Thymeleaf 템플릿을 사용하여 동적 대시보드를 제공합니다.
+ * [설계 의도]
+ * - Thymeleaf 템플릿을 사용한 서버 사이드 렌더링
+ * - @Controller는 뷰를 반환, @RestController는 데이터를 반환
+ * - URL 호환성을 위해 /dashboard → /simulator 리다이렉트 제공
+ *
+ * [레이어 역할]
+ * - Controller 레이어: HTTP 요청/응답 처리, 뷰 렌더링
+ * - 비즈니스 로직은 Service 레이어에 위임
  */
 @Controller
 public class DashboardController {

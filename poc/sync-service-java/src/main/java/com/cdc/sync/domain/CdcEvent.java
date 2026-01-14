@@ -1,4 +1,4 @@
-package com.cdc.sync.model;
+package com.cdc.sync.domain;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -6,21 +6,35 @@ import java.time.ZoneId;
 import java.util.Map;
 
 /**
- * CDC 이벤트 모델
+ * CDC 이벤트 도메인 모델
  *
- * Debezium에서 발생한 CDC 이벤트를 표현합니다.
+ * [설계 의도]
+ * - Debezium CDC 이벤트를 표현하는 도메인 객체
+ * - 불변 객체로 설계하면 더 좋지만, PoC에서는 setter 허용
+ * - 도메인 로직(getData, convertOperation 등)을 객체 내부에 캡슐화
  *
- * Debezium 이벤트 구조:
- *   {
- *     "schema": { ... },
- *     "payload": {
- *       "before": { 변경 전 데이터 },
- *       "after": { 변경 후 데이터 },
- *       "source": { 소스 DB 정보 },
- *       "op": "c|u|d|r",
- *       "ts_ms": 1234567890123
- *     }
+ * [Debezium 이벤트 구조]
+ * {
+ *   "schema": { ... },
+ *   "payload": {
+ *     "before": { 변경 전 데이터 },
+ *     "after": { 변경 후 데이터 },
+ *     "source": { 소스 DB 정보 },
+ *     "op": "c|u|d|r",
+ *     "ts_ms": 1234567890123
  *   }
+ * }
+ *
+ * [Operation 코드]
+ * - c (create): INSERT
+ * - u (update): UPDATE
+ * - d (delete): DELETE
+ * - r (read): 스냅샷 읽기 (INSERT로 처리)
+ *
+ * [프로덕션 고려사항]
+ * - Record 또는 불변 클래스로 변경 권장
+ * - equals/hashCode 구현 필요시 추가
+ * - Builder 패턴 적용 고려
  */
 public class CdcEvent {
 
@@ -54,9 +68,7 @@ public class CdcEvent {
      */
     private String changeHash;
 
-    // ===========================================
-    // Getters and Setters
-    // ===========================================
+    // ==================== Getters and Setters ====================
 
     public String getOperation() {
         return operation;
@@ -106,14 +118,16 @@ public class CdcEvent {
         this.changeHash = changeHash;
     }
 
-    // ===========================================
-    // 유틸리티 메서드
-    // ===========================================
+    // ==================== 도메인 로직 ====================
 
     /**
      * 변경된 데이터를 반환 (after 또는 before)
      *
-     * @return DELETE인 경우 before, 그 외 after
+     * [로직]
+     * - DELETE: before 데이터 반환 (after는 null)
+     * - INSERT/UPDATE: after 데이터 반환
+     *
+     * @return 변경된 데이터 Map
      */
     public Map<String, Object> getData() {
         if ("DELETE".equals(operation)) {
@@ -123,7 +137,7 @@ public class CdcEvent {
     }
 
     /**
-     * 원본 테이블 명 반환
+     * 원본 테이블명 반환
      */
     public String getSourceTable() {
         if (source != null) {
@@ -133,7 +147,7 @@ public class CdcEvent {
     }
 
     /**
-     * 원본 스키마 명 반환
+     * 원본 스키마명 반환
      */
     public String getSourceSchema() {
         if (source != null) {
@@ -150,9 +164,7 @@ public class CdcEvent {
                 changeHash != null ? changeHash.substring(0, 16) : "null");
     }
 
-    // ===========================================
-    // Static Factory Methods
-    // ===========================================
+    // ==================== Static Factory Methods ====================
 
     /**
      * Debezium 오퍼레이션 코드를 문자열로 변환

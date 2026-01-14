@@ -1,4 +1,4 @@
-package com.cdc.sync.monitoring;
+package com.cdc.sync.controller;
 
 import com.cdc.sync.config.CdcSimulatorConfig;
 import com.cdc.sync.config.CdcSimulatorConfig.TableConfig;
@@ -17,19 +17,24 @@ import java.util.stream.Collectors;
 /**
  * CDC 시뮬레이터 REST API 컨트롤러
  *
- * 동적 테이블 지원으로 모든 설정된 테이블에 대해 테스트 가능
+ * [설계 의도]
+ * - 동적 테이블 지원: application.yml 설정 기반으로 모든 테이블 테스트 가능
+ * - RESTful 설계: {tableName}/{db}/{operation} 형태의 URL 패턴
+ * - @PathVariable: URL 경로에서 동적 파라미터 추출
  *
- * 엔드포인트:
- *   - GET  /api/simulator/{tableName}/asis/data    : ASIS 원본 테이블 조회
- *   - GET  /api/simulator/{tableName}/tobe/data    : TOBE 원본 테이블 조회
- *   - GET  /api/simulator/{tableName}/asis/cdc     : ASIS CDC 테이블 조회
- *   - GET  /api/simulator/{tableName}/tobe/cdc     : TOBE CDC 테이블 조회
- *   - GET  /api/simulator/{tableName}/asis/staging : ASIS STAGING 테이블 조회
- *   - GET  /api/simulator/{tableName}/tobe/staging : TOBE STAGING 테이블 조회
- *   - GET  /api/sync-log                           : 동기화 로그 조회
- *   - POST /api/simulator/{tableName}/{db}/insert  : INSERT 테스트
- *   - POST /api/simulator/{tableName}/{db}/update  : UPDATE 테스트
- *   - POST /api/simulator/{tableName}/{db}/delete  : DELETE 테스트
+ * [엔드포인트 패턴]
+ * - GET  /api/simulator/{tableName}/{db}/data    : 원본 테이블 조회
+ * - GET  /api/simulator/{tableName}/{db}/cdc     : CDC 테이블 조회
+ * - GET  /api/simulator/{tableName}/{db}/staging : STAGING 테이블 조회
+ * - GET  /api/simulator/sync-log                 : 동기화 로그 조회
+ * - POST /api/simulator/{tableName}/{db}/insert  : INSERT 테스트
+ * - POST /api/simulator/{tableName}/{db}/update  : UPDATE 테스트
+ * - POST /api/simulator/{tableName}/{db}/delete  : DELETE 테스트
+ *
+ * [프로덕션 고려사항]
+ * - JdbcTemplate 직접 사용 → Repository 패턴으로 분리 권장
+ * - SQL Injection 방지: 동적 테이블명은 설정에서만 허용
+ * - 트랜잭션 경계 설정 필요
  */
 @RestController
 @RequestMapping("/api/simulator")
@@ -53,6 +58,10 @@ public class SimulatorController {
 
     /**
      * 원본 테이블 데이터 조회
+     *
+     * [설계 의도]
+     * - 설정 기반 동적 컬럼 조회: 테이블별 설정된 컬럼만 SELECT
+     * - Oracle FETCH FIRST: 페이징 처리 (Oracle 12c+)
      */
     @GetMapping("/{tableName}/{db}/data")
     public ResponseEntity<Map<String, Object>> getData(
@@ -182,6 +191,10 @@ public class SimulatorController {
 
     /**
      * 동기화 로그 조회
+     *
+     * [설계 의도]
+     * - 양쪽 DB의 로그를 병합하여 통합 뷰 제공
+     * - 시간순 정렬로 최신 이벤트 먼저 표시
      */
     @GetMapping("/sync-log")
     public ResponseEntity<Map<String, Object>> getSyncLog(
@@ -287,6 +300,11 @@ public class SimulatorController {
 
     /**
      * INSERT 테스트
+     *
+     * [설계 의도]
+     * - 동적 INSERT: 설정 기반으로 컬럼/값 자동 생성
+     * - PK 자동 채번: NUMBER 타입은 MAX+1, VARCHAR는 타임스탬프 기반
+     * - 기본값 처리: 설정의 default 또는 자동 생성
      */
     @PostMapping("/{tableName}/{db}/insert")
     public ResponseEntity<Map<String, Object>> testInsert(

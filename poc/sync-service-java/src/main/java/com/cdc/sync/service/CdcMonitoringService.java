@@ -1,4 +1,4 @@
-package com.cdc.sync.monitoring;
+package com.cdc.sync.service;
 
 import org.springframework.stereotype.Service;
 
@@ -13,12 +13,24 @@ import java.util.concurrent.atomic.AtomicLong;
 /**
  * CDC 모니터링 서비스
  *
- * CDC 이벤트 처리 통계 및 에러 로그를 관리합니다.
+ * [설계 의도]
+ * - 인메모리 통계 관리: 실시간 모니터링용 (재시작 시 초기화됨)
+ * - 스레드 안전: AtomicLong, ConcurrentHashMap, synchronized 사용
+ * - 순환 버퍼: 최근 N개만 유지하여 메모리 제한
+ *
+ * [프로덕션 고려사항]
+ * - 영속성: Redis/DB 저장으로 재시작 시에도 유지
+ * - 메트릭: Micrometer/Prometheus 연동 권장
+ * - 알림: 임계치 초과 시 알림 발송 기능 추가
+ *
+ * [사용 패턴]
+ * - CdcSyncService에서 이벤트 처리 시 호출
+ * - MonitoringController를 통해 REST API로 조회
  */
 @Service
 public class CdcMonitoringService {
 
-    // 통계 카운터
+    // 통계 카운터 (스레드 안전)
     private final AtomicLong totalReceived = new AtomicLong(0);
     private final AtomicLong totalSuccess = new AtomicLong(0);
     private final AtomicLong totalFailed = new AtomicLong(0);
@@ -26,11 +38,11 @@ public class CdcMonitoringService {
     // 테이블별 통계
     private final Map<String, TableStats> tableStats = new ConcurrentHashMap<>();
 
-    // 최근 에러 로그 (최대 100개)
+    // 최근 에러 로그 (순환 버퍼, 최대 100개)
     private final List<ErrorLog> recentErrors = new ArrayList<>();
     private static final int MAX_ERROR_LOGS = 100;
 
-    // 최근 처리 이벤트 (최대 50개)
+    // 최근 처리 이벤트 (순환 버퍼, 최대 50개)
     private final List<EventLog> recentEvents = new ArrayList<>();
     private static final int MAX_EVENT_LOGS = 50;
 
@@ -158,8 +170,11 @@ public class CdcMonitoringService {
         }
     }
 
-    // DTO 클래스들
+    // ==================== DTO 클래스들 ====================
 
+    /**
+     * 모니터링 통계 DTO
+     */
     public static class MonitoringStats {
         public long totalReceived;
         public long totalSuccess;
@@ -168,6 +183,9 @@ public class CdcMonitoringService {
         public Map<String, TableStats> tableStats;
     }
 
+    /**
+     * 테이블별 통계 DTO
+     */
     public static class TableStats {
         public AtomicLong received = new AtomicLong(0);
         public AtomicLong success = new AtomicLong(0);
@@ -176,6 +194,9 @@ public class CdcMonitoringService {
         public LocalDateTime lastError;
     }
 
+    /**
+     * 에러 로그 DTO
+     */
     public static class ErrorLog {
         public String timestamp;
         public String topic;
@@ -192,6 +213,9 @@ public class CdcMonitoringService {
         }
     }
 
+    /**
+     * 이벤트 로그 DTO
+     */
     public static class EventLog {
         public String timestamp;
         public String status;
