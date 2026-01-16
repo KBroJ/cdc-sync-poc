@@ -26,3 +26,7 @@ data/
 
 # Claude settings (local)
 .claude/
+
+# 업무 문서 (민감정보)
+docs/원본자료/*.hwp
+docs/원본자료/*.pdf
